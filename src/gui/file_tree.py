@@ -118,6 +118,7 @@ class ProjectTree(QTreeView):
         # Add actions based on item type
         if is_file:
             open_action = QAction("Open", self)
+            open_action.setIcon(self.window().resource_manager.get_icon("open"))
             open_action.triggered.connect(lambda: self.fileActivated.emit(path))
             menu.addAction(open_action)
         

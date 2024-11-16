@@ -41,8 +41,12 @@ class CasebookEditor(QsciScintilla):
         self.setMarginsFont(font)
         self.setMarginWidth(0, fontmetrics.horizontalAdvance("000") + 6)
         self.setMarginLineNumbers(0, True)
-        self.setMarginsForegroundColor(QColor(128, 128, 128))
-        self.setMarginsBackgroundColor(QColor(39, 40, 34))
+        self.setMarginsForegroundColor(QColor(128, 128, 128))  # Gray line numbers
+        self.setMarginsBackgroundColor(QColor(39, 40, 34))     # Dark background
+        
+        # Set colors
+        self.setPaper(QColor(39, 40, 34))  # Background
+        self.setColor(QColor(248, 248, 242))  # Default text
         
         # Set indentation defaults
         self.setIndentationsUseTabs(False)
@@ -76,10 +80,6 @@ class CasebookEditor(QsciScintilla):
         # Set other defaults
         self.setBraceMatching(QsciScintilla.BraceMatch.StrictBraceMatch)
         self.setAutoIndent(True)
-        
-        # Set colors
-        self.setPaper(QColor(39, 40, 34))  # Background
-        self.setColor(QColor(248, 248, 242))  # Default text
         
         # Set auto-closing brackets
         self.setBraceMatching(QsciScintilla.BraceMatch.StrictBraceMatch)

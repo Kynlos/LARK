@@ -305,10 +305,12 @@ class EditorTabs(QTabWidget):
         
         # Add actions
         save_action = QAction("Save", self)
+        save_action.setIcon(self.window().resource_manager.get_icon("save"))
         save_action.triggered.connect(self.save_current_file)
         menu.addAction(save_action)
         
         save_as_action = QAction("Save As...", self)
+        save_as_action.setIcon(self.window().resource_manager.get_icon("save"))
         save_as_action.triggered.connect(self.save_current_file_as)
         menu.addAction(save_as_action)
         
@@ -326,3 +328,20 @@ class EditorTabs(QTabWidget):
         """Close all open tabs."""
         while self.count() > 0:
             self.close_tab(0)
+            
+    def has_unsaved_changes(self):
+        """Check if any open files have unsaved changes."""
+        for i in range(self.count()):
+            container = self.widget(i)
+            if container and container.editor.isModified():
+                return True
+        return False
+        
+    def set_font_size(self, size):
+        """Set font size for all editors."""
+        for i in range(self.count()):
+            container = self.widget(i)
+            if container:
+                font = container.editor.font()
+                font.setPointSize(size)
+                container.editor.setFont(font)

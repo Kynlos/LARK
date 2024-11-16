@@ -33,6 +33,8 @@ ENV/
 
 # Project specific
 WORKING_BACKUP/
+scripts/
+test.case
 
 # System
 .DS_Store
