@@ -2,6 +2,9 @@
 
 A sophisticated desktop GUI editor for the Casebook interactive narrative language, built with Python, Qt6, and Lark.
 
+![image](https://github.com/user-attachments/assets/e573fbf6-9189-44e6-8060-eb5fb7a6a1f7)
+
+
 ## Features
 
 ### File Management
