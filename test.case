@@ -1,0 +1,33 @@
+// Example Casebook script
+SCENE intro {
+    JOHN: "Hello, welcome to the story!"
+    DO "The room is dimly lit"
+    IF player.hasItem("key") THEN {
+        JOHN: "I see you have the key..."
+    } ELSE {
+        JOHN: "You might want to find the key first."
+    }
+}
+
+FUNCTION check_inventory(item) {
+    RETURN player.hasItem(item)
+}
+
+SCENE treasure_room {
+    LET found = FALSE
+    
+    DO "You enter a dimly lit room filled with treasures"
+    
+    IF check_inventory("lantern") THEN {
+        GUARD: "Ah, you brought light!"
+        LET found = TRUE
+    } ELSE {
+        GUARD: "It's too dark to see anything..."
+    }
+    
+    WHILE found DO {
+        PLAYER: "I should look around..."
+        DO "You search the room carefully"
+    }
+}
+
