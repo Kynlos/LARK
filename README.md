@@ -229,10 +229,3 @@ The editor is built with:
 3. Make your changes
 4. Submit a pull request
 
-## License
-
-[Your license information here]
-
-## Credits
-
-[Your credits information here]
