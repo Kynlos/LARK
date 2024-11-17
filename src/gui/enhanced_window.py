@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QFileDialog, QMessageBox, QToolBar, QStatusBar,
     QLabel, QSpinBox, QComboBox, QHBoxLayout, QSplitter,
     QLineEdit, QDialog, QListWidget, QListWidgetItem,
-    QDialogButtonBox
+    QDialogButtonBox, QProgressDialog
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QSettings
 from PyQt6.QtGui import QAction, QKeySequence, QIcon, QFont
@@ -17,6 +17,8 @@ from .editor_tabs import EditorTabs
 from .search_dialog import SearchDialog
 from .search_manager import SearchManager
 from ..resources.resource_manager import ResourceManager
+from ..utils.export_manager import ExportManager
+from threading import Thread
 
 class StatusWidget(QWidget):
     """Custom status widget showing file info and editor state."""
@@ -112,6 +114,12 @@ class EnhancedWindow(QMainWindow):
         # Initialize managers
         self.grammar_manager = grammar_manager
         self.resource_manager = ResourceManager()
+        self.export_manager = ExportManager(self)
+        
+        # Initialize editor components
+        self.editor_tabs = EditorTabs(self, grammar_manager, self)
+        self.project_tree = ProjectTree(self)
+        self.project_tree.fileActivated.connect(self.open_file)
         
         # Initialize search components
         self.search_dialog = None
@@ -122,8 +130,6 @@ class EnhancedWindow(QMainWindow):
         self.recent_files = []
         
         # Create UI components first
-        self.editor_tabs = EditorTabs(self, grammar_manager, self)
-        self.project_tree = ProjectTree()
         self.zoom_spin = QSpinBox()
         
         # Initialize UI
@@ -134,7 +140,6 @@ class EnhancedWindow(QMainWindow):
         
         # Connect signals
         self.editor_tabs.currentFileChanged.connect(self.on_current_file_changed)
-        self.project_tree.fileActivated.connect(self.open_file)
         
         # Load settings
         self.load_settings()
@@ -294,6 +299,79 @@ class EnhancedWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction(self.save_action)
         file_menu.addAction(self.save_as_action)
+        
+        # Export/Import submenu
+        export_menu = file_menu.addMenu("Export/Import")
+        
+        # Export actions
+        export_menu.addAction(self.create_action(
+            "Export Project...",
+            "Export project as ZIP",
+            None,
+            "export.png",
+            self.export_project
+        ))
+        
+        export_menu.addAction(self.create_action(
+            "Export Settings...",
+            "Export application settings",
+            None,
+            "settings.png",
+            self.export_settings
+        ))
+        
+        export_menu.addSeparator()
+        
+        # Import actions
+        export_menu.addAction(self.create_action(
+            "Import Project...",
+            "Import project from ZIP",
+            None,
+            "import.png",
+            self.import_project
+        ))
+        
+        export_menu.addAction(self.create_action(
+            "Import Settings...",
+            "Import application settings",
+            None,
+            "settings.png",
+            self.import_settings
+        ))
+        
+        export_menu.addSeparator()
+        
+        # Export current file submenu
+        export_file_menu = export_menu.addMenu("Export Current File As...")
+        export_file_menu.addAction(self.create_action(
+            "Plain Text...",
+            "Export as .txt file",
+            None,
+            None,
+            lambda: self.export_current_file('txt')
+        ))
+        export_file_menu.addAction(self.create_action(
+            "HTML...",
+            "Export as .html file",
+            None,
+            None,
+            lambda: self.export_current_file('html')
+        ))
+        export_file_menu.addAction(self.create_action(
+            "Markdown...",
+            "Export as .md file",
+            None,
+            None,
+            lambda: self.export_current_file('md')
+        ))
+        export_file_menu.addAction(self.create_action(
+            "PDF...",
+            "Export as .pdf file",
+            None,
+            None,
+            lambda: self.export_current_file('pdf')
+        ))
+        
         file_menu.addSeparator()
         file_menu.addAction(self.exit_action)
         
@@ -365,7 +443,7 @@ class EnhancedWindow(QMainWindow):
         self.addToolBar(toolbar)
         return toolbar
         
-    def create_action(self, text, status_tip=None, shortcut=None, icon=None):
+    def create_action(self, text, status_tip=None, shortcut=None, icon=None, slot=None):
         """Create a QAction with the given properties."""
         action = QAction(text, self)
         if status_tip:
@@ -379,21 +457,28 @@ class EnhancedWindow(QMainWindow):
             icon_obj = self.resource_manager.get_icon(icon.replace('.png', ''))
             if icon_obj:
                 action.setIcon(icon_obj)
+        if slot:
+            action.triggered.connect(slot)
         return action
+        
+    def update_window_title(self):
+        """Update the window title with current file."""
+        current = self.editor_tabs.currentWidget()
+        if current:
+            filepath = current.get_file_path()
+            if filepath:
+                title = f"{os.path.basename(filepath)} - Casebook Editor"
+            else:
+                title = "Untitled - Casebook Editor"
+        else:
+            title = "Casebook Editor"
+            
+        self.setWindowTitle(title)
         
     def on_current_file_changed(self, filepath):
         """Handle current file change."""
-        # Update window title
-        title = filepath if filepath else "Untitled"
-        self.setWindowTitle(f"{title} - Casebook Editor")
-        
-        # Connect signals from current editor
-        container = self.editor_tabs.currentWidget()
-        if container:
-            editor = container.editor
-            editor.cursorPositionChanged.connect(self.update_cursor_position)
-            editor.sceneChanged.connect(self.update_scene)
-            self.update_edit_actions()
+        self.update_window_title()
+        self.update_edit_actions()
         
     def update_cursor_position(self):
         """Update the cursor position in status bar."""
@@ -433,7 +518,7 @@ class EnhancedWindow(QMainWindow):
             self.add_recent_file(filepath)
             
     def open_file(self, filepath=None):
-        """Open a file."""
+        """Open a file in the editor."""
         if not filepath:
             filepath, _ = QFileDialog.getOpenFileName(
                 self, "Open File", "",
@@ -443,41 +528,25 @@ class EnhancedWindow(QMainWindow):
         if not filepath:
             return
             
-        # Convert to absolute path
-        filepath = os.path.abspath(filepath)
-        
+        if not os.path.exists(filepath):
+            QMessageBox.warning(
+                self,
+                "File Not Found",
+                f"Could not find file:\n{filepath}"
+            )
+            return
+            
         try:
-            # Check if file is already open
-            for i in range(self.editor_tabs.count()):
-                container = self.editor_tabs.widget(i)
-                if container and self.editor_tabs.get_file_path(container.editor) == filepath:
-                    self.editor_tabs.setCurrentIndex(i)
-                    return
-                    
-            # Open new file
-            with open(filepath, 'r', encoding='utf-8') as f:
-                content = f.read()
-                
-            # Create new editor
-            container, editor = self.editor_tabs.create_editor(filepath)
-            editor.setText(content)
-            
-            # Add tab
-            filename = os.path.basename(filepath)
-            index = self.editor_tabs.addTab(container, filename)
-            self.editor_tabs.setCurrentIndex(index)
-            
-            # Update file path
-            self.editor_tabs.open_files[filepath] = editor
-            
-            # Start watching file
-            self.editor_tabs.file_watcher.watch_file(filepath)
-            
-            # Add to recent files
-            self.add_recent_file(filepath)
-            
+            editor = self.editor_tabs.open_file(filepath)
+            if editor:
+                self.add_recent_file(filepath)
+                self.update_window_title()
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Could not open file: {str(e)}")
+            QMessageBox.critical(
+                self,
+                "Error Opening File",
+                f"Could not open file: {filepath}\n\nError: {str(e)}"
+            )
             
     def save_file(self):
         """Save the current file."""
@@ -669,64 +738,71 @@ class EnhancedWindow(QMainWindow):
             editor.paste()
             
     def update_edit_actions(self):
-        """Update edit action states based on current editor."""
+        """Update edit action states."""
+        has_editor = False
         container = self.editor_tabs.currentWidget()
-        has_editor = container is not None
-        
-        self.undo_action.setEnabled(has_editor and container.editor.isUndoAvailable())
-        self.redo_action.setEnabled(has_editor and container.editor.isRedoAvailable())
-        self.cut_action.setEnabled(has_editor and container.editor.hasSelectedText())
-        self.copy_action.setEnabled(has_editor and container.editor.hasSelectedText())
+        if container:
+            has_editor = True
+            editor = container.editor
+            
+        # Update edit actions
+        self.undo_action.setEnabled(has_editor and editor.isUndoAvailable())
+        self.redo_action.setEnabled(has_editor and editor.isRedoAvailable())
+        self.cut_action.setEnabled(has_editor and editor.hasSelectedText())
+        self.copy_action.setEnabled(has_editor and editor.hasSelectedText())
         self.paste_action.setEnabled(has_editor)
 
     def load_settings(self):
         """Load application settings."""
-        settings = QSettings("Codeium", "Casebook Editor")
+        settings = QSettings('Codeium', 'Casebook Editor')
         
-        # Load window geometry
-        geometry = settings.value("geometry")
+        # Window geometry
+        geometry = settings.value('geometry')
         if geometry:
             self.restoreGeometry(geometry)
             
-        # Load window state
-        state = settings.value("windowState")
+        # Window state
+        state = settings.value('windowState')
         if state:
             self.restoreState(state)
             
-        # Load recent files
-        recent_files = settings.value("recentFiles", [])
+        # Recent files
+        recent_files = settings.value('recentFiles', [])
         if recent_files:
             self.recent_files = recent_files
             self.update_recent_menu()
             
-        # Load editor settings
-        font_size = settings.value("fontSize", 12, type=int)
-        self.editor_tabs.set_font_size(font_size)
-        
-        # Load zoom level
-        zoom = settings.value("zoom", 100, type=int)
-        if hasattr(self, 'zoom_spin'):
-            self.zoom_spin.setValue(zoom)
+        # Font size
+        font_size = settings.value('fontSize', 10, type=int)
+        if font_size and hasattr(self, 'editor_tabs'):
+            self.editor_tabs.update_font_size(font_size)
+            
+        # Toolbar visibility
+        toolbar_visible = settings.value('toolbarVisible', True, type=bool)
+        if hasattr(self, 'toolbar') and self.toolbar:
+            self.toolbar.setVisible(toolbar_visible)
             
     def save_settings(self):
         """Save application settings."""
-        settings = QSettings("Codeium", "Casebook Editor")
+        settings = QSettings('Codeium', 'Casebook Editor')
         
-        # Save window geometry and state
-        settings.setValue("geometry", self.saveGeometry())
-        settings.setValue("windowState", self.saveState())
+        # Window geometry and state
+        settings.setValue('geometry', self.saveGeometry())
+        settings.setValue('windowState', self.saveState())
         
-        # Save recent files
-        settings.setValue("recentFiles", self.recent_files)
+        # Recent files
+        settings.setValue('recentFiles', self.recent_files)
         
-        # Save editor settings
-        if hasattr(self, 'zoom_spin'):
-            settings.setValue("zoom", self.zoom_spin.value())
+        # Font size
+        if hasattr(self, 'editor_tabs'):
+            current = self.editor_tabs.currentWidget()
+            if current and current.editor:
+                font_size = current.editor.font().pointSize()
+                settings.setValue('fontSize', font_size)
             
-        # Save font size
-        editor = self.editor_tabs.currentWidget()
-        if editor:
-            settings.setValue("fontSize", editor.editor.font().pointSize())
+        # Toolbar visibility
+        if hasattr(self, 'toolbar') and self.toolbar:
+            settings.setValue('toolbarVisible', self.toolbar.isVisible())
             
     def closeEvent(self, event):
         """Handle window close event."""
@@ -805,3 +881,168 @@ class EnhancedWindow(QMainWindow):
                 self.statusBar().showMessage(f"Replaced {count} occurrence{'s' if count > 1 else ''}")
             else:
                 self.statusBar().showMessage("No replacements made")
+
+    def export_project(self):
+        """Export the entire project."""
+        try:
+            project_path = self.project_tree.root_path
+            if not project_path:
+                QMessageBox.warning(self, "Export Error", "No project directory selected.")
+                return
+                
+            # Show progress dialog
+            self.progress_dialog = QProgressDialog("Exporting project...", "Cancel", 0, 100, self)
+            self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+            self.progress_dialog.setMinimumDuration(0)
+            self.progress_dialog.setValue(0)
+            
+            # Start export
+            self.export_manager.export_project(project_path)
+            # Connect to worker's signals after it's created
+            self.export_manager.worker.finished.connect(self.on_export_finished)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", str(e))
+            
+    def export_current_file(self, export_format):
+        """Export current file in specified format."""
+        try:
+            current_file = self.editor_tabs.get_current_file()
+            if not current_file:
+                QMessageBox.warning(self, "Export Error", "No file is currently open.")
+                return
+                
+            # Get save path from user
+            file_formats = {
+                'txt': ('Text Files', '*.txt'),
+                'html': ('HTML Files', '*.html'),
+                'md': ('Markdown Files', '*.md'),
+                'pdf': ('PDF Files', '*.pdf')
+            }
+            
+            format_info = file_formats.get(export_format, ('All Files', '*.*'))
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                f"Export as {export_format.upper()}",
+                os.path.splitext(current_file)[0] + f".{export_format}",
+                f"{format_info[0]} (*.{export_format})"
+            )
+            
+            if not file_path:
+                return
+                
+            # Show progress dialog for larger files
+            self.progress_dialog = QProgressDialog(f"Exporting to {export_format.upper()}...", "Cancel", 0, 100, self)
+            self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+            self.progress_dialog.setMinimumDuration(0)
+            self.progress_dialog.setValue(0)
+            
+            # Start export
+            self.export_manager.export_file(current_file, export_format, file_path)
+            # Connect to worker's signals after it's created
+            self.export_manager.worker.finished.connect(self.on_export_finished)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", str(e))
+            
+    def on_export_finished(self, success, path, error):
+        """Handle export completion."""
+        if hasattr(self, 'progress_dialog'):
+            self.progress_dialog.close()
+            delattr(self, 'progress_dialog')
+            
+        if success:
+            QMessageBox.information(
+                self,
+                "Export Successful",
+                f"File exported to:\n{path}"
+            )
+        else:
+            QMessageBox.critical(self, "Export Error", error)
+            
+    def import_project(self):
+        """Import a project from backup."""
+        zip_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Project",
+            "",
+            "ZIP Files (*.zip)"
+        )
+        
+        if not zip_path:
+            return
+            
+        target_dir, _ = QFileDialog.getSaveFileName(
+            self,
+            "Select Import Location",
+            "",
+            "Directory"
+        )
+        
+        if not target_dir:
+            return
+            
+        try:
+            imported_path = self.export_manager.import_project(zip_path, target_dir)
+            QMessageBox.information(
+                self,
+                "Import Successful",
+                f"Project imported to:\n{imported_path}"
+            )
+            
+            # Ask if user wants to open the imported project
+            reply = QMessageBox.question(
+                self,
+                "Open Project",
+                "Would you like to open the imported project?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                self.project_tree.set_root_path(imported_path)
+        except Exception as e:
+            QMessageBox.critical(self, "Import Error", str(e))
+            
+    def export_settings(self):
+        """Export application settings."""
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Settings",
+            "",
+            "JSON Files (*.json)"
+        )
+        
+        if not file_path:
+            return
+            
+        try:
+            self.export_manager.export_settings(file_path)
+            QMessageBox.information(
+                self,
+                "Export Successful",
+                f"Settings exported to:\n{file_path}"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", str(e))
+            
+    def import_settings(self):
+        """Import application settings."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Settings",
+            "",
+            "JSON Files (*.json)"
+        )
+        
+        if not file_path:
+            return
+            
+        try:
+            self.export_manager.import_settings(file_path)
+            QMessageBox.information(
+                self,
+                "Import Successful",
+                "Settings imported successfully.\nSome changes may require a restart."
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Import Error", str(e))

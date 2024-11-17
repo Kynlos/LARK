@@ -10,45 +10,41 @@ A sophisticated desktop GUI editor for the Casebook interactive narrative langua
 
 ### Editor Features
 - Syntax highlighting for multiple languages
-- Dark theme with consistent color scheme
 - Line numbers and current line highlighting
-- Undo/redo support
-- Cut, copy, and paste functionality
-- Zoom in/out with mouse wheel or keyboard shortcuts
-- Status bar with file information
+- Multiple file support with tabs
+- Auto-indentation and code folding
+- Undo/redo functionality
+- Cut, copy, and paste operations
+- Find and replace with regex support
+- Real-time file search (Ctrl+P)
 
-### Advanced Search and Replace
-- Real-time file search (Quick Open, Ctrl+P)
-- Advanced find and replace dialog (Ctrl+F, Ctrl+H)
+### Project Features
+- Project tree view
+- File creation and deletion
+- Quick file navigation
+- Recent files tracking
+- Auto-save functionality
+- External file change detection
+
+### Export/Import Features
+- Project backup and restore
+- Multiple file export formats:
+  * Plain Text (.txt)
+  * HTML with syntax highlighting
+  * Markdown (.md)
+  * PDF (coming soon)
+- Settings export/import
+- Progress tracking for large operations
+- Non-blocking export operations
+
+### Search Features
+- Real-time file search
+- Advanced find and replace
 - Regular expression support
 - Case sensitivity options
 - Whole word matching
-- Multi-file search and replace
+- Multi-file search
 - Search history
-- Replace preview
-- Context-aware search results
-
-### File Management
-- Open multiple files in tabs
-- Recent files history
-- File tree navigation
-- Quick file search with real-time results
-- Auto-detection of file types
-- Unsaved changes indicator
-
-### Code Navigation
-- Quick file open (Ctrl+P) with real-time search
-- File tree for project navigation
-- Recent files menu
-- Tab-based file switching
-
-### User Interface
-- Modern dark theme
-- Customizable toolbar
-- Quick action bar for file search
-- Split view with file tree and editor
-- Status bar with file information
-- Persistent window state and settings
 
 ## Installation
 
@@ -224,4 +220,3 @@ The editor is built with:
 2. Create a feature branch
 3. Make your changes
 4. Submit a pull request
-
