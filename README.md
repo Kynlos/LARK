@@ -8,55 +8,47 @@ A sophisticated desktop GUI editor for the Casebook interactive narrative langua
 
 ## Features
 
-### File Management
-- File tree sidebar for project navigation
-- Tabs for multiple open files
-- Recent files menu (up to 10 files)
-- Quick file opener (Ctrl+P)
-- Auto-save functionality
-- File change detection and reload
-
 ### Editor Features
-- Intelligent syntax highlighting:
-  * Keywords in Deep Pink
-  * Strings in Khaki
-  * Scene elements in Medium Purple
-  * Actions in Medium Turquoise
-  * Character names in Yellow Green
-  * Comments in Light Cyan
-- Modern code editing features:
-  * Undo/redo
-  * Cut/copy/paste
-  * Multiple cursors (Ctrl+D)
-  * Code folding
-  * Indent guides
-  * Auto-closing brackets/quotes
-  * Bracket matching
-  * Error/warning indicators
-- Line numbers and auto-indentation
-- Word wrapping
-- Zoom controls (50-200%)
-- Scene detection
-- Cross-platform compatibility
-- Minimap code overview
-  * Zoomed-out view of code
-  * Current viewport indicator
-  * Click-to-scroll navigation
-  * Live updates
+- Syntax highlighting for multiple languages
+- Dark theme with consistent color scheme
+- Line numbers and current line highlighting
+- Undo/redo support
+- Cut, copy, and paste functionality
+- Zoom in/out with mouse wheel or keyboard shortcuts
+- Status bar with file information
 
-### Project Management
-- Project file tree
-- File operations:
-  * Create new files
-  * Open existing files
-  * Save/Save As
-  * Rename files
-  * Delete files
-- Tab management:
-  * Multiple open files
-  * Drag and drop tabs
-  * Close tabs
-  * Save all
+### Advanced Search and Replace
+- Real-time file search (Quick Open, Ctrl+P)
+- Advanced find and replace dialog (Ctrl+F, Ctrl+H)
+- Regular expression support
+- Case sensitivity options
+- Whole word matching
+- Multi-file search and replace
+- Search history
+- Replace preview
+- Context-aware search results
+
+### File Management
+- Open multiple files in tabs
+- Recent files history
+- File tree navigation
+- Quick file search with real-time results
+- Auto-detection of file types
+- Unsaved changes indicator
+
+### Code Navigation
+- Quick file open (Ctrl+P) with real-time search
+- File tree for project navigation
+- Recent files menu
+- Tab-based file switching
+
+### User Interface
+- Modern dark theme
+- Customizable toolbar
+- Quick action bar for file search
+- Split view with file tree and editor
+- Status bar with file information
+- Persistent window state and settings
 
 ## Installation
 

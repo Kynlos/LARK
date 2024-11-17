@@ -1,4 +1,4 @@
-"""Enhanced main window implementation for the Casebook Editor."""
+"""Enhanced main window implementation."""
 
 import os
 import sys
@@ -6,12 +6,16 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QMainWindow, QVBoxLayout, QWidget, QMenuBar, QMenu, 
     QFileDialog, QMessageBox, QToolBar, QStatusBar,
-    QLabel, QSpinBox, QComboBox, QHBoxLayout, QSplitter
+    QLabel, QSpinBox, QComboBox, QHBoxLayout, QSplitter,
+    QLineEdit, QDialog, QListWidget, QListWidgetItem,
+    QDialogButtonBox
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QSettings
 from PyQt6.QtGui import QAction, QKeySequence, QIcon, QFont
 from .file_tree import ProjectTree
 from .editor_tabs import EditorTabs
+from .search_dialog import SearchDialog
+from .search_manager import SearchManager
 from ..resources.resource_manager import ResourceManager
 
 class StatusWidget(QWidget):
@@ -109,226 +113,257 @@ class EnhancedWindow(QMainWindow):
         self.grammar_manager = grammar_manager
         self.resource_manager = ResourceManager()
         
+        # Initialize search components
+        self.search_dialog = None
+        self.search_manager = None
+        
         # Initialize state
         self.current_file = None
         self.recent_files = []
-        self.load_recent_files()
         
-        # Create UI components
+        # Create UI components first
         self.editor_tabs = EditorTabs(self, grammar_manager, self)
         self.project_tree = ProjectTree()
+        self.zoom_spin = QSpinBox()
+        
+        # Initialize UI
+        self.setup_ui()
+        self.setup_actions()
+        self.setup_menus()
+        self.setup_status_bar()
         
         # Connect signals
         self.editor_tabs.currentFileChanged.connect(self.on_current_file_changed)
         self.project_tree.fileActivated.connect(self.open_file)
         
-        # Initialize UI
-        self.init_ui()
-        
         # Load settings
         self.load_settings()
+        self.load_recent_files()
         
-    def init_ui(self):
-        """Initialize the user interface."""
+        # Set window properties
         self.setWindowTitle("Casebook Editor")
+        self.setMinimumSize(800, 600)
+        
+    def setup_ui(self):
+        """Initialize the user interface."""
         self.setGeometry(100, 100, 1024, 768)
-
+        
         # Create central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Create layout
-        layout = QHBoxLayout()
+        # Create main layout
+        layout = QVBoxLayout(central_widget)
         layout.setContentsMargins(0, 0, 0, 0)
-        central_widget.setLayout(layout)
+        layout.setSpacing(0)
         
-        # Create splitter
+        # Create quick action container
+        quick_action_container = QWidget()
+        quick_action_container.setVisible(False)
+        quick_action_layout = QVBoxLayout(quick_action_container)
+        quick_action_layout.setContentsMargins(5, 5, 5, 5)
+        quick_action_layout.setSpacing(0)
+        self.quick_action_container = quick_action_container
+        layout.addWidget(quick_action_container)
+        
+        # Create quick action bar
+        self.quick_action_bar = QLineEdit()
+        self.quick_action_bar.setPlaceholderText("Type to search files (Ctrl+P)")
+        self.quick_action_bar.textChanged.connect(self.on_quick_action_text_changed)
+        self.quick_action_bar.returnPressed.connect(self.handle_quick_action_select)
+        self.quick_action_bar.setStyleSheet("""
+            QLineEdit {
+                padding: 8px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                margin: 0;
+                background: #f5f5f5;
+                font-size: 14px;
+            }
+        """)
+        quick_action_layout.addWidget(self.quick_action_bar)
+        
+        # Create results list
+        self.quick_action_list = QListWidget()
+        self.quick_action_list.setStyleSheet("""
+            QListWidget {
+                border: 1px solid #ccc;
+                border-top: none;
+                border-radius: 0 0 3px 3px;
+                background: #ffffff;
+            }
+            QListWidget::item {
+                padding: 5px;
+                border-bottom: 1px solid #eee;
+            }
+            QListWidget::item:selected {
+                background: #e0e0e0;
+                color: #000000;
+            }
+        """)
+        self.quick_action_list.itemDoubleClicked.connect(self.handle_quick_action_select)
+        self.quick_action_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.quick_action_list.setMaximumHeight(300)
+        quick_action_layout.addWidget(self.quick_action_list)
+        
+        # Create editor container
+        editor_container = QWidget()
+        editor_layout = QHBoxLayout(editor_container)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(editor_container)
+        
+        # Create splitter for tree and editor
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        layout.addWidget(splitter)
+        editor_layout.addWidget(splitter)
         
-        # Create file tree
-        self.file_tree = ProjectTree()
-        self.file_tree.fileActivated.connect(self.open_file)
-        splitter.addWidget(self.file_tree)
-        
-        # Create editor tabs
-        self.editor_tabs = EditorTabs(grammar_manager=self.grammar_manager, main_window=self)
-        self.editor_tabs.currentFileChanged.connect(self.on_current_file_changed)
+        # Add file tree and editor tabs
+        splitter.addWidget(self.project_tree)
         splitter.addWidget(self.editor_tabs)
         
         # Set splitter sizes (30% tree, 70% editor)
         splitter.setSizes([300, 700])
-
-        # Create UI elements
-        self.create_menu_bar()
-        self.create_tool_bar()
-        self.create_status_bar()
         
         # Set initial file tree root to current directory
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-        self.file_tree.set_root_path(project_root)
-
-    def create_menu_bar(self):
-        """Create the menu bar with all actions."""
-        menubar = self.menuBar()
+        self.project_tree.set_root_path(project_root)
         
-        # File menu
-        file_menu = menubar.addMenu("&File")
+    def setup_actions(self):
+        """Set up the application's actions."""
+        # File actions
+        self.new_action = self.create_action("&New", "Create a new file", QKeySequence.StandardKey.New, "new.png")
+        self.new_action.triggered.connect(self.new_file)
         
-        new_action = self.create_action("&New", "Create a new file", QKeySequence.StandardKey.New, "new.png")
-        new_action.triggered.connect(self.new_file)
-        file_menu.addAction(new_action)
+        self.open_action = self.create_action("&Open", "Open a file", QKeySequence.StandardKey.Open, "open.png")
+        self.open_action.triggered.connect(self.open_file)
         
-        open_action = self.create_action("&Open", "Open a file", QKeySequence.StandardKey.Open, "open.png")
-        open_action.triggered.connect(self.open_file)
-        file_menu.addAction(open_action)
-        
-        quick_open_action = self.create_action("Quick &Open", "Quickly open a file", "Ctrl+P", "open.png")
-        quick_open_action.triggered.connect(self.quick_open)
-        file_menu.addAction(quick_open_action)
+        self.quick_open_action = self.create_action("Quick &Open", "Quickly open a file", "Ctrl+P", "open.png")
+        self.quick_open_action.triggered.connect(self.quick_open)
         
         # Recent files submenu
-        self.recent_menu = file_menu.addMenu("Recent Files")
+        self.recent_menu = QMenu("Recent Files")
         self.update_recent_menu()
         
-        file_menu.addSeparator()
+        self.save_action = self.create_action("&Save", "Save the current file", QKeySequence.StandardKey.Save, "save.png")
+        self.save_action.triggered.connect(self.save_file)
         
-        save_action = self.create_action("&Save", "Save the current file", QKeySequence.StandardKey.Save, "save.png")
-        save_action.triggered.connect(self.save_file)
-        file_menu.addAction(save_action)
+        self.save_as_action = self.create_action("Save &As", "Save as a new file", QKeySequence.StandardKey.SaveAs, "save.png")
+        self.save_as_action.triggered.connect(self.save_file_as)
         
-        save_as_action = self.create_action("Save &As", "Save as a new file", QKeySequence.StandardKey.SaveAs, "save.png")
-        save_as_action.triggered.connect(self.save_file_as)
-        file_menu.addAction(save_as_action)
+        self.exit_action = self.create_action("&Exit", "Exit the application", QKeySequence.StandardKey.Quit, "exit.png")
+        self.exit_action.triggered.connect(self.close)
         
-        file_menu.addSeparator()
-        
-        exit_action = self.create_action("&Exit", "Exit the application", QKeySequence.StandardKey.Quit, "exit.png")
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-        
-        # Edit menu
-        edit_menu = menubar.addMenu("&Edit")
-        
-        # Create undo action
-        self.undo_action = self.create_action("&Undo", "Undo last action", QKeySequence.StandardKey.Undo, "undo.png")
-        self.undo_action.triggered.connect(self.undo)
-        edit_menu.addAction(self.undo_action)
-        
-        # Create redo action
-        self.redo_action = self.create_action("&Redo", "Redo last action", QKeySequence.StandardKey.Redo, "redo.png")
-        self.redo_action.triggered.connect(self.redo)
-        edit_menu.addAction(self.redo_action)
-        
-        edit_menu.addSeparator()
-        
-        # Create cut action
+        # Edit actions
         self.cut_action = self.create_action("Cu&t", "Cut selection", QKeySequence.StandardKey.Cut, "cut.png")
         self.cut_action.triggered.connect(self.cut)
-        edit_menu.addAction(self.cut_action)
         
-        # Create copy action
         self.copy_action = self.create_action("&Copy", "Copy selection", QKeySequence.StandardKey.Copy, "copy.png")
         self.copy_action.triggered.connect(self.copy)
-        edit_menu.addAction(self.copy_action)
         
-        # Create paste action
-        self.paste_action = self.create_action("&Paste", "Paste from clipboard", QKeySequence.StandardKey.Paste, "paste.png")
+        self.paste_action = self.create_action("&Paste", "Paste clipboard content", QKeySequence.StandardKey.Paste, "paste.png")
         self.paste_action.triggered.connect(self.paste)
+        
+        self.undo_action = self.create_action("&Undo", "Undo last action", QKeySequence.StandardKey.Undo, "undo.png")
+        self.undo_action.triggered.connect(self.undo)
+        
+        self.redo_action = self.create_action("&Redo", "Redo last action", QKeySequence.StandardKey.Redo, "redo.png")
+        self.redo_action.triggered.connect(self.redo)
+        
+        # Search actions
+        self.find_action = self.create_action("&Find...", "Find text", QKeySequence.StandardKey.Find, "find.png")
+        self.find_action.triggered.connect(self.show_find_dialog)
+        
+        self.replace_action = self.create_action("R&eplace...", "Replace text", QKeySequence.StandardKey.Replace, "replace.png")
+        self.replace_action.triggered.connect(self.show_replace_dialog)
+        
+        # View actions
+        self.zoom_in_action = self.create_action("Zoom &In", "Increase font size", QKeySequence.StandardKey.ZoomIn, "zoom-in.png")
+        self.zoom_in_action.triggered.connect(self.zoom_in)
+        
+        self.zoom_out_action = self.create_action("Zoom &Out", "Decrease font size", QKeySequence.StandardKey.ZoomOut, "zoom-out.png")
+        self.zoom_out_action.triggered.connect(self.zoom_out)
+        
+    def setup_menus(self):
+        """Set up the application's menus."""
+        # File menu
+        file_menu = self.menuBar().addMenu("&File")
+        file_menu.addAction(self.new_action)
+        file_menu.addAction(self.open_action)
+        file_menu.addAction(self.quick_open_action)
+        file_menu.addMenu(self.recent_menu)
+        file_menu.addSeparator()
+        file_menu.addAction(self.save_action)
+        file_menu.addAction(self.save_as_action)
+        file_menu.addSeparator()
+        file_menu.addAction(self.exit_action)
+        
+        # Edit menu
+        edit_menu = self.menuBar().addMenu("&Edit")
+        edit_menu.addAction(self.cut_action)
+        edit_menu.addAction(self.copy_action)
         edit_menu.addAction(self.paste_action)
+        edit_menu.addSeparator()
+        edit_menu.addAction(self.undo_action)
+        edit_menu.addAction(self.redo_action)
+        edit_menu.addSeparator()
+        edit_menu.addAction(self.find_action)
+        edit_menu.addAction(self.replace_action)
         
         # View menu
-        view_menu = menubar.addMenu("&View")
-        
-        # Create zoom actions
-        zoom_in_action = self.create_action("Zoom &In", "Increase font size", QKeySequence.StandardKey.ZoomIn, "zoom-in.png")
-        zoom_in_action.triggered.connect(self.zoom_in)
-        view_menu.addAction(zoom_in_action)
-        
-        zoom_out_action = self.create_action("Zoom &Out", "Decrease font size", QKeySequence.StandardKey.ZoomOut, "zoom-out.png")
-        zoom_out_action.triggered.connect(self.zoom_out)
-        view_menu.addAction(zoom_out_action)
-        
-        view_menu.addSeparator()
+        view_menu = self.menuBar().addMenu("&View")
+        view_menu.addAction(self.zoom_in_action)
+        view_menu.addAction(self.zoom_out_action)
         
         # Help menu
-        help_menu = menubar.addMenu("&Help")
-        
+        help_menu = self.menuBar().addMenu("&Help")
         about_action = self.create_action("&About", "About Casebook Editor", None, "about.png")
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
         
-    def create_tool_bar(self):
-        """Create the main toolbar."""
-        toolbar = QToolBar()
-        toolbar.setObjectName("mainToolBar")  # Set object name for QSettings
-        toolbar.setMovable(False)
-        toolbar.setIconSize(QSize(16, 16))
-        
-        # File operations
-        new_action = self.create_action("New", "Create new file", QKeySequence.StandardKey.New, "new.png")
-        new_action.triggered.connect(self.new_file)
-        toolbar.addAction(new_action)
-        
-        open_action = self.create_action("Open", "Open file", QKeySequence.StandardKey.Open, "open.png")
-        open_action.triggered.connect(self.open_file)
-        toolbar.addAction(open_action)
-        
-        save_action = self.create_action("Save", "Save file", QKeySequence.StandardKey.Save, "save.png")
-        save_action.triggered.connect(self.save_file)
-        toolbar.addAction(save_action)
-        
-        toolbar.addSeparator()
-        
-        # Edit operations
-        cut_action = self.create_action("Cut", "Cut selection", QKeySequence.StandardKey.Cut, "cut.png")
-        cut_action.triggered.connect(self.cut)
-        toolbar.addAction(cut_action)
-        
-        copy_action = self.create_action("Copy", "Copy selection", QKeySequence.StandardKey.Copy, "copy.png")
-        copy_action.triggered.connect(self.copy)
-        toolbar.addAction(copy_action)
-        
-        paste_action = self.create_action("Paste", "Paste from clipboard", QKeySequence.StandardKey.Paste, "paste.png")
-        paste_action.triggered.connect(self.paste)
-        toolbar.addAction(paste_action)
-        
-        toolbar.addSeparator()
-        
-        # Undo/Redo
-        undo_action = self.create_action("Undo", "Undo last action", QKeySequence.StandardKey.Undo, "undo.png")
-        undo_action.triggered.connect(self.undo)
-        toolbar.addAction(undo_action)
-        
-        redo_action = self.create_action("Redo", "Redo last action", QKeySequence.StandardKey.Redo, "redo.png")
-        redo_action.triggered.connect(self.redo)
-        toolbar.addAction(redo_action)
-        
-        toolbar.addSeparator()
-        
-        # Zoom controls
-        zoom_out_action = self.create_action("Zoom Out", "Decrease font size", QKeySequence.StandardKey.ZoomOut, "zoom-out.png")
-        zoom_out_action.triggered.connect(self.zoom_out)
-        toolbar.addAction(zoom_out_action)
-        
-        self.zoom_spin = QSpinBox()
-        self.zoom_spin.setRange(50, 200)
-        self.zoom_spin.setValue(100)
-        self.zoom_spin.setSuffix("%")
-        self.zoom_spin.valueChanged.connect(self.zoom_changed)
-        toolbar.addWidget(self.zoom_spin)
-        
-        zoom_in_action = self.create_action("Zoom In", "Increase font size", QKeySequence.StandardKey.ZoomIn, "zoom-in.png")
-        zoom_in_action.triggered.connect(self.zoom_in)
-        toolbar.addAction(zoom_in_action)
-        
-        self.addToolBar(toolbar)
-        
-    def create_status_bar(self):
+    def setup_status_bar(self):
         """Create the status bar with file and editor information."""
         self.status_widget = StatusWidget()
         self.statusBar().addPermanentWidget(self.status_widget)
+        
+    def create_tool_bar(self):
+        """Create the main toolbar."""
+        toolbar = QToolBar()
+        toolbar.setObjectName("mainToolBar")
+        toolbar.setMovable(False)
+        toolbar.setIconSize(QSize(16, 16))
+        
+        # Add actions
+        toolbar.addAction(self.new_action)
+        toolbar.addAction(self.open_action)
+        toolbar.addAction(self.save_action)
+        toolbar.addSeparator()
+        toolbar.addAction(self.cut_action)
+        toolbar.addAction(self.copy_action)
+        toolbar.addAction(self.paste_action)
+        toolbar.addSeparator()
+        toolbar.addAction(self.undo_action)
+        toolbar.addAction(self.redo_action)
+        toolbar.addSeparator()
+        toolbar.addAction(self.find_action)
+        toolbar.addAction(self.replace_action)
+        
+        # Add zoom controls
+        toolbar.addSeparator()
+        toolbar.addAction(self.zoom_out_action)
+        
+        # Configure zoom spinbox
+        self.zoom_spin.setMinimum(50)
+        self.zoom_spin.setMaximum(200)
+        self.zoom_spin.setValue(100)
+        self.zoom_spin.setSuffix("%")
+        self.zoom_spin.setFixedWidth(70)
+        self.zoom_spin.valueChanged.connect(self.zoom_changed)
+        toolbar.addWidget(self.zoom_spin)
+        
+        toolbar.addAction(self.zoom_in_action)
+        
+        self.addToolBar(toolbar)
+        return toolbar
         
     def create_action(self, text, status_tip=None, shortcut=None, icon=None):
         """Create a QAction with the given properties."""
@@ -528,11 +563,76 @@ class EnhancedWindow(QMainWindow):
         
     def quick_open(self):
         """Show quick open dialog."""
-        from .quick_open import QuickOpenDialog
-        dialog = QuickOpenDialog(self.recent_files, self)
-        dialog.fileSelected.connect(self.open_file)
-        dialog.exec()
-
+        self.quick_action_container.setVisible(True)
+        self.quick_action_bar.setFocus()
+        self.quick_action_bar.clear()
+        self.quick_action_list.clear()
+        
+    def on_quick_action_text_changed(self, text):
+        """Handle quick action text changes."""
+        self.quick_action_list.clear()
+        
+        if not text.strip():
+            return
+            
+        # Search for files
+        matching_files = []
+        root_dir = self.project_tree.root_path
+        search_text = text.lower()
+        
+        for root, dirs, files in os.walk(root_dir):
+            for file in files:
+                if search_text in file.lower():
+                    full_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(full_path, root_dir)
+                    
+                    # Create item with relative path
+                    item = QListWidgetItem(rel_path)
+                    item.setData(Qt.ItemDataRole.UserRole, full_path)
+                    
+                    # Add icon based on file type
+                    # TODO: Add file type icons
+                    
+                    self.quick_action_list.addItem(item)
+                    
+                    # Limit to first 50 matches for performance
+                    if self.quick_action_list.count() >= 50:
+                        return
+        
+        # Select first item if there are results
+        if self.quick_action_list.count() > 0:
+            self.quick_action_list.setCurrentRow(0)
+            
+    def handle_quick_action_select(self):
+        """Handle quick action selection."""
+        current_item = self.quick_action_list.currentItem()
+        if current_item:
+            file_path = current_item.data(Qt.ItemDataRole.UserRole)
+            self.quick_action_container.setVisible(False)
+            self.open_file(file_path)
+        else:
+            self.quick_action_container.setVisible(False)
+            
+    def keyPressEvent(self, event):
+        """Handle key press events."""
+        if self.quick_action_container.isVisible():
+            if event.key() == Qt.Key.Key_Escape:
+                self.quick_action_container.setVisible(False)
+            elif event.key() == Qt.Key.Key_Up:
+                current_row = self.quick_action_list.currentRow()
+                if current_row > 0:
+                    self.quick_action_list.setCurrentRow(current_row - 1)
+                event.accept()
+            elif event.key() == Qt.Key.Key_Down:
+                current_row = self.quick_action_list.currentRow()
+                if current_row < self.quick_action_list.count() - 1:
+                    self.quick_action_list.setCurrentRow(current_row + 1)
+                event.accept()
+            else:
+                super().keyPressEvent(event)
+        else:
+            super().keyPressEvent(event)
+            
     def undo(self):
         """Undo last action."""
         container = self.editor_tabs.currentWidget()
@@ -663,3 +763,45 @@ class EnhancedWindow(QMainWindow):
     def show_about(self):
         """Show about dialog."""
         QMessageBox.information(self, "About Casebook Editor", "Casebook Editor is a modern text editor.")
+
+    def show_find_dialog(self):
+        """Show the find dialog."""
+        if not self.search_dialog:
+            self.search_dialog = SearchDialog(self)
+            self.search_manager = SearchManager(self.editor_tabs)
+            
+            # Connect signals
+            self.search_dialog.searchRequested.connect(
+                lambda params: self.search_manager.search(params, self.search_dialog)
+            )
+            self.search_dialog.replaceRequested.connect(
+                lambda params: self.handle_replace(params)
+            )
+            
+        self.search_dialog.show()
+        self.search_dialog.activateWindow()
+        self.search_dialog.raise_()
+        
+    def show_replace_dialog(self):
+        """Show the replace dialog."""
+        if not self.search_dialog:
+            self.show_find_dialog()
+        self.search_dialog.show()
+        self.search_dialog.activateWindow()
+        self.search_dialog.raise_()
+        # Switch to replace tab
+        self.search_dialog.setCurrentIndex(1)
+        
+    def handle_replace(self, params):
+        """Handle replace operations."""
+        if not self.search_manager:
+            return
+            
+        if params.get('preview_only'):
+            self.search_manager.preview_replace(params, self.search_dialog)
+        else:
+            count = self.search_manager.replace_all(params)
+            if count > 0:
+                self.statusBar().showMessage(f"Replaced {count} occurrence{'s' if count > 1 else ''}")
+            else:
+                self.statusBar().showMessage("No replacements made")

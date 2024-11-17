@@ -1,318 +1,151 @@
-# Casebook Editor User Guide
+# LARK Casebook Editor User Guide
+
+## Table of Contents
+1. [Getting Started](#getting-started)
+2. [Basic Navigation](#basic-navigation)
+3. [File Management](#file-management)
+4. [Editor Features](#editor-features)
+5. [Search and Replace](#search-and-replace)
+6. [Keyboard Shortcuts](#keyboard-shortcuts)
 
 ## Getting Started
 
 ### Installation
+1. Ensure Python 3.12 or higher is installed
+2. Install required packages: `pip install -r requirements.txt`
+3. Run the editor: `python main.py`
 
-1. Install Python 3.12 or higher from [python.org](https://python.org)
-2. Create a virtual environment (recommended):
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+### Interface Overview
+- File tree on the left
+- Editor area on the right
+- Toolbar at the top
+- Status bar at the bottom
+- Quick action bar (activated with Ctrl+P)
 
-### Running the Editor
-
-```bash
-python main.py
-```
-
-## Interface Overview
-
-### Main Window
-The editor window is divided into several sections:
-- Left: File tree for project navigation
-- Center: Editor tabs for open files
-- Right: Minimap for code overview
-- Bottom: Status bar showing file info and cursor position
-- Top: Menu bar and toolbar with common actions
+## Basic Navigation
 
 ### File Tree
-- Shows all files in the current project directory
-- Double-click a file to open it
-- Right-click for context menu:
-  * Open file
-  * Rename file
-  * Delete file
+- Click folders to expand/collapse
+- Double-click files to open
+- Right-click for context menu
+- Files are color-coded by type
 
-### Editor Tabs
-- Shows all open files
-- Drag tabs to reorder
-- Right-click for tab options:
-  * Save
-  * Save As
-  * Close
-  * Close All
-
-### Minimap
-- Shows zoomed-out view of code
-- Highlights current viewport position
-- Click or drag to navigate
-- Updates in real-time as you type
-- Adjusts to editor theme colors
-
-### Status Bar
-Shows information about the current file:
-- File name
-- Cursor position (line and column)
-- File encoding
-- Line ending type
-- Current scene name
-
-### Toolbar
-Quick access to common actions:
-- New file
-- Open file
-- Save file
-- Undo/Redo
-- Zoom controls
+### Tabs
+- Click to switch between files
+- Middle-click or click 'x' to close
+- Drag to reorder
+- Asterisk (*) indicates unsaved changes
 
 ## File Management
 
-### Creating New Files
-1. Click "New" in toolbar or press Ctrl+N
-2. Start typing your content
-3. Save with Ctrl+S when ready
-
 ### Opening Files
-Multiple ways to open files:
-1. Click "Open" in toolbar or press Ctrl+O
-2. Double-click file in file tree
-3. Use Quick Open (Ctrl+P) to search and open files
-4. Select from Recent Files menu
-
-### Quick Open (Ctrl+P)
-1. Press Ctrl+P to open the dialog
-2. Type part of the filename
-3. Use arrow keys to select
-4. Press Enter to open selected file
-
-### Saving Files
-- Save (Ctrl+S): Save current file
-- Save As (Ctrl+Shift+S): Save with new name
-- Auto-save: Files are automatically saved every minute
-
-### File Change Detection
-If a file is modified outside the editor:
-1. You'll be notified of external changes
-2. Choose to reload the file or keep your version
-3. Auto-save helps prevent conflicts
-
-## Editing Features
-
-### Basic Editing
-- Cut: Ctrl+X
-- Copy: Ctrl+C
-- Paste: Ctrl+V
-- Undo: Ctrl+Z
-- Redo: Ctrl+Y or Ctrl+Shift+Z
-
-### Navigation
-- Arrow keys: Move cursor
-- Home/End: Start/end of line
-- Ctrl+Home/End: Start/end of file
-- Ctrl+Left/Right: Move by words
-- Click minimap: Jump to position
-
-### Selection
-- Shift+Arrow: Extend selection
-- Ctrl+A: Select all
-- Double-click: Select word
-- Triple-click: Select line
-
-### Multiple Cursors
-- Ctrl+D: Add cursor at next occurrence of selected text
-- If no text is selected, selects word under cursor
-- Type to edit at all cursor positions
-- Backspace works at all cursor positions
-- Cursors are automatically updated as you edit
-- Click elsewhere to clear additional cursors
-
-### Code Folding
-- Click the [+]/[-] symbols in the margin to fold/unfold
-- Folding works on:
-  * Scene blocks
-  * Function blocks
-  * Control structures (if/else, while)
-- Folded code shows a summary line
-- Folding state is preserved while editing
-
-### Auto-Closing Brackets
-- Opening bracket/quote automatically adds closing one:
-  * { → {}
-  * " → ""
-  * ' → ''
-- Cursor is placed between the pair
-- Works with multiple cursors
-
-### Indent Guides
-- Vertical lines show indentation levels
-- Makes nested blocks easier to read
-- Color matches editor theme
-- Updates as you type
-
-### Error/Warning Indicators
-- Red circle: Syntax error
-- Yellow circle: Warning
-- Hover to see details
-- Click to jump to problem
-- Updates as you type
-
-### View Options
-- Zoom: Use toolbar controls or Ctrl+Mouse Wheel
-  * Range: 50% to 200%
-  * Default: 100%
-- Word Wrap: Lines wrap at window edge
-- Minimap: Code overview on right side
-  * Shows zoomed-out view
-  * Highlights current section
-  * Click to navigate
-  * Real-time updates
-
-## Language Features
-
-### Scene Detection
-The editor automatically detects and tracks scenes:
-- Current scene shown in status bar
-- Scene names highlighted in code
-- Quick navigation between scenes (coming soon)
-
-### Syntax Highlighting
-Different colors for:
-- Keywords (Deep Pink)
-- Strings (Khaki)
-- Scene elements (Medium Purple)
-- Actions (Medium Turquoise)
-- Character names (Yellow Green)
-- Comments (Light Cyan)
-
-### Auto-Indentation
-- Press Enter: Maintains current indentation
-- Opening brace: Increases indentation
-- Closing brace: Decreases indentation
-
-## Project Management
-
-### Project Structure
-Recommended project organization:
-```
-your-project/
-├── scenes/
-│   ├── intro.case
-│   ├── chapter1.case
-│   └── ending.case
-├── characters/
-│   └── definitions.case
-├── functions/
-│   └── common.case
-└── main.case
-```
-
-### Working with Multiple Files
-1. Use the file tree to navigate
-2. Open related files in tabs
-3. Drag tabs to arrange them
-4. Use Quick Open (Ctrl+P) to switch files
-5. Use minimap for quick navigation
+1. Use File → Open (Ctrl+O)
+2. Double-click in file tree
+3. Quick Open (Ctrl+P):
+   - Press Ctrl+P
+   - Start typing filename
+   - Use arrow keys to navigate results
+   - Press Enter to open selected file
+   - Results update in real-time
+   - Shows relative paths
+   - ESC to close
 
 ### Recent Files
-- Last 10 opened files remembered
-- Access from File > Recent Files
-- Clear list from the same menu
+- Access from File → Recent Files
+- Last 10 files are remembered
+- Click to reopen
+
+## Editor Features
+
+### Syntax Highlighting
+- Automatic language detection
+- Dark theme with consistent colors:
+  * Keywords: Pink (#F92672)
+  * Strings: Yellow (#E6DB74)
+  * Comments: Grayish blue (#6272A4)
+  * Numbers: Purple (#AE81FF)
+  * Functions: Green (#A6E22E)
+  * Classes: Light blue (#66D9EF)
+
+### Code Editing
+- Line numbers
+- Current line highlighting
+- Undo/Redo (Ctrl+Z/Ctrl+Y)
+- Cut/Copy/Paste
+- Auto-indentation
+- Multiple cursors
+
+### View Options
+- Zoom in/out (Ctrl+/Ctrl-)
+- Mouse wheel zoom (Ctrl+Scroll)
+- Word wrap toggle
+- Show/hide line numbers
+
+## Search and Replace
+
+### Quick File Search (Ctrl+P)
+- Real-time search as you type
+- Shows relative file paths
+- Keyboard navigation:
+  * Up/Down arrows to move selection
+  * Enter to open selected file
+  * Esc to close
+- Results limited to 50 for performance
+- Double-click to open file
+
+### Find in Files (Ctrl+F)
+- Search in current file or all files
+- Regular expression support
+- Case sensitivity toggle
+- Whole word matching
+- Results preview with context
+- Search history
+- Navigate results with Up/Down
+
+### Replace (Ctrl+H)
+- Replace in current file or all files
+- Preview changes before applying
+- Regular expression support
+- Case sensitivity toggle
+- Whole word matching
+- Replace history
+- Undo support for replacements
 
 ## Keyboard Shortcuts
 
 ### File Operations
-- New File: Ctrl+N
-- Open File: Ctrl+O
-- Quick Open: Ctrl+P
-- Save: Ctrl+S
-- Save As: Ctrl+Shift+S
-- Close Tab: Ctrl+W
+- Ctrl+N: New file
+- Ctrl+O: Open file
+- Ctrl+S: Save
+- Ctrl+Shift+S: Save as
+- Ctrl+P: Quick open
+- Ctrl+W: Close tab
+- Ctrl+Q: Quit
 
 ### Editing
-- Undo: Ctrl+Z
-- Redo: Ctrl+Y or Ctrl+Shift+Z
-- Cut: Ctrl+X
-- Copy: Ctrl+C
-- Paste: Ctrl+V
-- Select All: Ctrl+A
-- Add Cursor: Ctrl+D
+- Ctrl+Z: Undo
+- Ctrl+Y: Redo
+- Ctrl+X: Cut
+- Ctrl+C: Copy
+- Ctrl+V: Paste
+- Ctrl+A: Select all
+
+### Search
+- Ctrl+P: Quick file search
+- Ctrl+F: Find
+- Ctrl+H: Replace
+- F3: Find next
+- Shift+F3: Find previous
+- Esc: Close search
 
 ### View
-- Zoom In: Ctrl++
-- Zoom Out: Ctrl+-
-- Reset Zoom: Ctrl+0
+- Ctrl+Plus: Zoom in
+- Ctrl+Minus: Zoom out
+- Ctrl+0: Reset zoom
+- F11: Toggle full screen
 
-## Tips and Tricks
-
-### Efficient Navigation
-1. Use Quick Open (Ctrl+P) for fast file switching
-2. Use the file tree for project overview
-3. Keep related files in tabs
-4. Use minimap for quick scrolling
-5. Use code folding for better overview
-
-### Multiple Cursors
-1. Select a word and press Ctrl+D
-2. Keep pressing Ctrl+D to add more cursors
-3. Edit at all cursor positions simultaneously
-4. Great for renaming variables or making similar changes
-5. Click anywhere to clear cursors
-
-### Code Organization
-1. Use code folding to focus on specific sections
-2. Follow consistent indentation
-3. Group related scenes in folders
-4. Use meaningful scene names
-5. Keep functions organized
-
-### Auto-save
-- Files save automatically every minute
-- Modified files show * in tab name
-- Manual save with Ctrl+S still recommended
-
-### File Organization
-1. Group related files in directories
-2. Use consistent naming conventions
-3. Keep main story flow in separate files
-
-## Troubleshooting
-
-### Common Issues
-
-1. File won't open
-   - Check file permissions
-   - Verify file exists
-   - Check for file lock by other programs
-
-2. Changes not saving
-   - Check disk space
-   - Verify write permissions
-   - Try Save As to new location
-
-3. External file changes
-   - Choose whether to reload
-   - Save your changes first if needed
-   - Use version control for better tracking
-
-### Getting Help
-
-If you encounter issues:
-1. Check error messages in status bar
-2. Look for syntax errors in code
-3. Consult this guide
-4. Report bugs through the issue tracker
-
-## Future Features
-
-Coming soon:
-1. Git integration
-2. Find and replace
-3. Advanced error handling
-4. Theme customization
-5. Collaborative editing
+### Navigation
+- Ctrl+Tab: Next tab
+- Ctrl+Shift+Tab: Previous tab
+- Alt+Left: Go back
+- Alt+Right: Go forward
