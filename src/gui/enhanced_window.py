@@ -103,6 +103,7 @@ class EnhancedWindow(QMainWindow):
     
     def __init__(self, grammar_manager=None):
         super().__init__()
+        self.setObjectName("mainWindow")  # Set object name for QSettings
         
         # Initialize managers
         self.grammar_manager = grammar_manager
@@ -259,10 +260,11 @@ class EnhancedWindow(QMainWindow):
         help_menu.addAction(about_action)
         
     def create_tool_bar(self):
-        """Create the toolbar with common actions."""
+        """Create the main toolbar."""
         toolbar = QToolBar()
+        toolbar.setObjectName("mainToolBar")  # Set object name for QSettings
+        toolbar.setMovable(False)
         toolbar.setIconSize(QSize(16, 16))
-        self.addToolBar(toolbar)
         
         # File operations
         new_action = self.create_action("New", "Create new file", QKeySequence.StandardKey.New, "new.png")
@@ -321,6 +323,8 @@ class EnhancedWindow(QMainWindow):
         zoom_in_action.triggered.connect(self.zoom_in)
         toolbar.addAction(zoom_in_action)
         
+        self.addToolBar(toolbar)
+        
     def create_status_bar(self):
         """Create the status bar with file and editor information."""
         self.status_widget = StatusWidget()
@@ -370,8 +374,29 @@ class EnhancedWindow(QMainWindow):
         
     def new_file(self):
         """Create a new file."""
-        self.editor_tabs.addTab(self.editor_tabs.create_editor(), "Untitled")
+        filepath, _ = QFileDialog.getSaveFileName(
+            self, "New File", "",
+            "Casebook Files (*.case);;Python Files (*.py);;All Files (*.*)"
+        )
         
+        if filepath:
+            # Create new editor with appropriate lexer
+            container, editor = self.editor_tabs.create_editor(filepath)
+            
+            # Add tab
+            filename = os.path.basename(filepath)
+            index = self.editor_tabs.addTab(container, filename)
+            self.editor_tabs.setCurrentIndex(index)
+            
+            # Update file path
+            self.editor_tabs.open_files[filepath] = editor
+            
+            # Start watching file
+            self.editor_tabs.file_watcher.watch_file(filepath)
+            
+            # Add to recent files
+            self.add_recent_file(filepath)
+            
     def open_file(self, filepath=None):
         """Open a file."""
         if not filepath:
@@ -399,7 +424,7 @@ class EnhancedWindow(QMainWindow):
                 content = f.read()
                 
             # Create new editor
-            container, editor = self.editor_tabs.create_editor()
+            container, editor = self.editor_tabs.create_editor(filepath)
             editor.setText(content)
             
             # Add tab

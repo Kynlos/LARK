@@ -68,7 +68,7 @@ class EditorTabs(QTabWidget):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         
-    def create_editor(self):
+    def create_editor(self, filepath=None):
         """Create a new editor instance."""
         editor = CasebookEditor(self, self.grammar_manager)
         editor.modificationChanged.connect(self.on_modification_changed)
@@ -76,40 +76,41 @@ class EditorTabs(QTabWidget):
         editor.selectionChanged.connect(self.on_selection_changed)
         editor.SCN_MODIFIED.connect(self.on_text_changed)  # For undo/redo state
         
+        # Set up lexer based on file type
+        editor.setup_lexer(filepath)
+        
         # Create container with minimap
         container = EditorContainer(editor)
         return container, editor
         
     def open_file(self, filepath):
         """Open a file in a new tab."""
-        # Check if file is already open
-        if filepath in self.open_files:
-            self.setCurrentWidget(self.open_files[filepath].parent())
-            return
-            
         try:
-            # Create new editor
-            container, editor = self.create_editor()
-            
-            # Load file content
             with open(filepath, 'r', encoding='utf-8') as f:
-                editor.setText(f.read())
+                content = f.read()
                 
-            # Add to tab widget
+            # Create new editor
+            container, editor = self.create_editor(filepath)
+            
+            # Set content
+            editor.setText(content)
+            
+            # Add tab
             filename = os.path.basename(filepath)
             index = self.addTab(container, filename)
+            self.setCurrentIndex(index)
             
-            # Store in open files map
+            # Update file path
             self.open_files[filepath] = editor
             
             # Start watching file
             self.file_watcher.watch_file(filepath)
             
-            # Set as current tab
-            self.setCurrentIndex(index)
+            return True
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not open file: {str(e)}")
+            return False
             
     def save_current_file(self):
         """Save the current file."""

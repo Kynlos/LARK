@@ -1,18 +1,24 @@
 """Casebook editor widget implementation."""
 
+import os
 from PyQt6.QtWidgets import QScrollBar
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QTextCursor, QPainter
 from PyQt6.Qsci import (
     QsciScintilla, QsciLexerCustom, QsciAPIs,
-    QsciStyle
+    QsciStyle, QsciLexerPython, QsciLexerCPP,
+    QsciLexerHTML, QsciLexerCSS, QsciLexerJavaScript,
+    QsciLexerXML, QsciLexerYAML, QsciLexerJSON,
+    QsciLexerMarkdown, QsciLexerSQL, QsciLexerBash,
+    QsciLexerDiff, QsciLexerProperties
 )
 from .lexer import CasebookLexer
 
 class CasebookEditor(QsciScintilla):
-    """Custom editor widget for Casebook language."""
+    """Casebook editor widget."""
     
-    sceneChanged = pyqtSignal(str)  # Signal emitted when current scene changes
+    # Custom signals
+    sceneChanged = pyqtSignal(str)
     
     def __init__(self, parent=None, grammar_manager=None):
         super().__init__(parent)
@@ -22,11 +28,185 @@ class CasebookEditor(QsciScintilla):
         self.setup_editor()
         self.setup_margins()
         self.setup_folding()
-        self.setup_lexer()
         self.current_scene = None
         self.cursorPositionChanged.connect(self.check_current_scene)
         self.selectionChanged.connect(self.update_additional_cursors)
         
+    def get_lexer_for_file(self, filepath):
+        """Get the appropriate lexer based on file extension."""
+        if not filepath:
+            return None
+            
+        ext = os.path.splitext(filepath)[1].lower()
+        lexer_map = {
+            '.case': lambda: CasebookLexer(self, self.grammar_manager),
+            '.py': QsciLexerPython,
+            '.cpp': QsciLexerCPP,
+            '.h': QsciLexerCPP,
+            '.hpp': QsciLexerCPP,
+            '.c': QsciLexerCPP,
+            '.html': QsciLexerHTML,
+            '.htm': QsciLexerHTML,
+            '.css': QsciLexerCSS,
+            '.js': QsciLexerJavaScript,
+            '.xml': QsciLexerXML,
+            '.yaml': QsciLexerYAML,
+            '.yml': QsciLexerYAML,
+            '.json': QsciLexerJSON,
+            '.md': QsciLexerMarkdown,
+            '.sql': QsciLexerSQL,
+            '.sh': QsciLexerBash,
+            '.bash': QsciLexerBash,
+            '.diff': QsciLexerDiff,
+            '.patch': QsciLexerDiff,
+            '.properties': QsciLexerProperties,
+            '.ini': QsciLexerProperties,
+            '.conf': QsciLexerProperties,
+        }
+        
+        lexer_class = lexer_map.get(ext)
+        if lexer_class:
+            if callable(lexer_class):
+                lexer = lexer_class()
+            else:
+                lexer = lexer_class(self)
+                
+            # Set lexer font
+            font = self.font()
+            lexer.setFont(font)
+            
+            # Apply dark theme colors
+            if ext != '.case':  # Don't override Casebook lexer colors
+                self.apply_dark_theme_to_lexer(lexer)
+                
+            return lexer
+            
+        return None
+        
+    def apply_dark_theme_to_lexer(self, lexer):
+        """Apply dark theme colors to a lexer."""
+        # Define colors
+        background = QColor(39, 40, 34)      # Dark background
+        foreground = QColor(248, 248, 242)   # Light foreground
+        keyword = QColor(249, 38, 114)       # Pink
+        string = QColor(230, 219, 116)       # Yellow
+        comment = QColor(98, 114, 164)       # Grayish blue
+        number = QColor(174, 129, 255)       # Purple
+        operator = QColor(249, 38, 114)      # Pink
+        identifier = QColor(248, 248, 242)   # White
+        function = QColor(166, 226, 46)      # Green
+        class_name = QColor(102, 217, 239)   # Light blue
+        list_marker = QColor(253, 151, 31)   # Orange
+        code_block_bg = QColor(44, 49, 58)   # Light blue tinted background
+        
+        # Set paper (background) for all styles
+        for style in range(128):  # QScintilla uses style numbers 0-127
+            lexer.setPaper(background, style)
+        
+        # Common style numbers across different lexers
+        if isinstance(lexer, QsciLexerPython):
+            lexer.setColor(foreground, QsciLexerPython.Default)
+            lexer.setColor(keyword, QsciLexerPython.Keyword)
+            lexer.setColor(comment, QsciLexerPython.Comment)
+            lexer.setColor(string, QsciLexerPython.DoubleQuotedString)
+            lexer.setColor(string, QsciLexerPython.SingleQuotedString)
+            lexer.setColor(string, QsciLexerPython.TripleDoubleQuotedString)
+            lexer.setColor(string, QsciLexerPython.TripleSingleQuotedString)
+            lexer.setColor(number, QsciLexerPython.Number)
+            lexer.setColor(operator, QsciLexerPython.Operator)
+            lexer.setColor(identifier, QsciLexerPython.Identifier)
+            lexer.setColor(function, QsciLexerPython.FunctionMethodName)
+            lexer.setColor(class_name, QsciLexerPython.ClassName)
+            
+        elif isinstance(lexer, QsciLexerCPP):
+            lexer.setColor(foreground, QsciLexerCPP.Default)
+            lexer.setColor(keyword, QsciLexerCPP.Keyword)
+            lexer.setColor(comment, QsciLexerCPP.Comment)
+            lexer.setColor(string, QsciLexerCPP.DoubleQuotedString)
+            lexer.setColor(string, QsciLexerCPP.SingleQuotedString)
+            lexer.setColor(number, QsciLexerCPP.Number)
+            lexer.setColor(operator, QsciLexerCPP.Operator)
+            lexer.setColor(identifier, QsciLexerCPP.Identifier)
+            lexer.setColor(function, QsciLexerCPP.GlobalFunction)
+            
+        elif isinstance(lexer, QsciLexerMarkdown):
+            # Basic text
+            lexer.setColor(foreground, 0)  # Default
+            
+            # Headers (styles 1-6)
+            for i in range(1, 7):
+                lexer.setColor(class_name, i)
+                lexer.setFont(QFont("Consolas", pointSize=self.font().pointSize() + (6 - i)), i)
+            
+            # Set a light blue background for code blocks first
+            # Try all possible code block style numbers
+            code_styles = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+            for style in code_styles:
+                lexer.setPaper(code_block_bg, style)
+                lexer.setColor(foreground, style)
+            
+            # Other styles
+            lexer.setColor(list_marker, 7)   # Emphasis
+            lexer.setColor(function, 8)      # Bold
+            lexer.setColor(string, 9)        # Link
+            lexer.setColor(list_marker, 12)  # Bullet point
+            lexer.setColor(list_marker, 13)  # Number
+            lexer.setColor(comment, 14)      # Quote
+            lexer.setColor(string, 15)       # Reference
+            
+            # Make sure code blocks are properly styled
+            # Override any previous styling for code blocks
+            code_styles = [
+                21,  # Code Block
+                20,  # Code
+                19,  # Code2
+                18,  # Code3
+                17,  # PreChar
+                16   # PreProc
+            ]
+            for style in code_styles:
+                lexer.setPaper(code_block_bg, style)
+                lexer.setColor(foreground, style)
+            
+        elif isinstance(lexer, QsciLexerHTML):
+            lexer.setColor(foreground, QsciLexerHTML.Default)
+            lexer.setColor(keyword, QsciLexerHTML.Tag)
+            lexer.setColor(function, QsciLexerHTML.Attribute)
+            lexer.setColor(string, QsciLexerHTML.DoubleQuotedString)
+            lexer.setColor(string, QsciLexerHTML.SingleQuotedString)
+            lexer.setColor(comment, QsciLexerHTML.Comment)
+            
+        elif isinstance(lexer, QsciLexerCSS):
+            lexer.setColor(foreground, QsciLexerCSS.Default)
+            lexer.setColor(keyword, QsciLexerCSS.Tag)
+            lexer.setColor(class_name, QsciLexerCSS.ClassSelector)
+            lexer.setColor(function, QsciLexerCSS.PseudoClass)
+            lexer.setColor(operator, QsciLexerCSS.Operator)
+            lexer.setColor(string, QsciLexerCSS.DoubleQuotedString)
+            lexer.setColor(string, QsciLexerCSS.SingleQuotedString)
+            lexer.setColor(comment, QsciLexerCSS.Comment)
+            
+        elif isinstance(lexer, QsciLexerJSON):
+            lexer.setColor(foreground, QsciLexerJSON.Default)
+            lexer.setColor(keyword, QsciLexerJSON.Keyword)
+            lexer.setColor(string, QsciLexerJSON.String)
+            lexer.setColor(number, QsciLexerJSON.Number)
+            lexer.setColor(operator, QsciLexerJSON.Operator)
+            
+        else:
+            # For any other lexer, at least set basic colors
+            lexer.setDefaultColor(foreground)
+            lexer.setDefaultPaper(background)
+            
+    def setup_lexer(self, filepath=None):
+        """Set up the syntax highlighter."""
+        lexer = self.get_lexer_for_file(filepath)
+        if lexer:
+            self.setLexer(lexer)
+        else:
+            # No specific lexer found, remove any existing lexer
+            self.setLexer(None)
+            
     def setup_editor(self):
         """Configure the editor settings."""
         # Set font defaults
@@ -128,11 +308,6 @@ class CasebookEditor(QsciScintilla):
         
         # Connect folding signals
         self.marginClicked.connect(self.on_margin_clicked)
-        
-    def setup_lexer(self):
-        """Set up the syntax highlighter."""
-        lexer = CasebookLexer(self, self.grammar_manager)
-        self.setLexer(lexer)
         
     def on_margin_clicked(self, margin, line, modifiers):
         """Handle margin clicks for folding."""
